@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CRYPTO-500 | Envoi de texte crypté (RSA, premiers de 500 chiffres)</title>
+  <title>CRYPTO-500 | Envoi et réception de texte crypté (RSA, premiers de 500 chiffres)</title>
 
   <!-- Bibliothèque d'icônes : Lucide -->
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.453.0/dist/umd/lucide.min.js"></script>
@@ -21,7 +21,7 @@
         <div class="logo-icon"><i data-lucide="lock-keyhole"></i></div>
         <div>
           <h1>CRYPTO-500</h1>
-          <p class="muted">Envoi de texte crypté · nombres premiers de 500 chiffres</p>
+          <p class="muted">Envoi et réception de texte crypté · nombres premiers de 500 chiffres</p>
         </div>
       </div>
 
@@ -35,16 +35,7 @@
     <!-- ============ NAVIGATION ============ -->
     <nav class="tabs">
       <button class="tab-btn active" data-tab="tab-transmission" id="nav-btn-transmission">
-        <i data-lucide="send"></i> Transmission
-      </button>
-      <button class="tab-btn" data-tab="tab-keys" id="nav-btn-keys">
-        <i data-lucide="key-round"></i> Clés
-      </button>
-      <button class="tab-btn" data-tab="tab-workspace" id="nav-btn-workspace">
-        <i data-lucide="file-lock-2"></i> Atelier
-      </button>
-      <button class="tab-btn" data-tab="tab-security" id="nav-btn-security">
-        <i data-lucide="shield-check"></i> Sécurité
+        <i data-lucide="send"></i> Transmission & Réception
       </button>
       <button class="tab-btn" data-tab="tab-theory" id="nav-btn-theory">
         <i data-lucide="book-open"></i> Théorie
@@ -52,122 +43,156 @@
     </nav>
 
 
-    <!-- ============ ONGLET 1 : TRANSMISSION ============ -->
+    <!-- ============ ONGLET 1 : TRANSMISSION & RÉCEPTION ============ -->
     <main id="tab-transmission" class="tab-content active">
 
-      <article class="card actor" id="master-send-block">
-        <div class="actor-head">
-          <div class="avatar avatar-alice"><i data-lucide="send"></i></div>
-          <div>
-            <h3>Envoi du message</h3>
-            <span class="muted" id="target-summary">Aucune cible enregistrée</span>
-          </div>
-        </div>
+      <div class="grid-2">
 
-        <!-- Cible : nom + identifiant réseau -->
-        <div class="block">
-          <label class="label"><i data-lucide="user-round"></i> Cible</label>
-
-          <input type="text" id="recipient-name" placeholder="Nom de la cible (ex. Karim Koné)" maxlength="30" autocomplete="off">
-
-          <div class="row-between">
-            <label for="recipient-ip" class="label"><i data-lucide="globe"></i> Identifiant réseau</label>
-            <span id="target-ip-badge" class="badge">IP à saisir</span>
-          </div>
-          <div class="ip-group">
-            <span class="ip-tag">TCP://</span>
-            <input type="text" id="recipient-ip" placeholder="192.168.1.45:8080" autocomplete="off" spellcheck="false">
-          </div>
-
-          <select id="recipient-digits">
-            <option value="500" selected>Premiers de 500 chiffres</option>
-            <option value="250">Premiers de 250 chiffres</option>
-            <option value="100">Premiers de 100 chiffres</option>
-            <option value="50">Premiers de 50 chiffres</option>
-          </select>
-
-          <p class="small danger" id="recipient-error"></p>
-
-          <button type="button" class="btn btn-primary btn-sm" id="btn-create-recipient">
-            <i data-lucide="user-plus"></i> Enregistrer et générer les clés
-          </button>
-
-          <label for="recipient-select" class="label"><i data-lucide="users"></i> Cible active</label>
-          <select id="recipient-select"></select>
-        </div>
-
-        <!-- Clé publique (remplie automatiquement) -->
-        <div class="block">
-          <div class="row-between">
-            <span class="label"><i data-lucide="circle-help"></i> Afficher la clé publique ?</span>
-            <div class="toggle">
-              <button type="button" class="toggle-btn active" id="btn-pubkey-opt-yes" data-choice="yes"><i data-lucide="eye"></i> Oui</button>
-              <button type="button" class="toggle-btn" id="btn-pubkey-opt-no" data-choice="no"><i data-lucide="eye-off"></i> Non</button>
+        <!-- COLONNE 1 : ENVOI DU MESSAGE (ALICE / EXPÉDITEUR) -->
+        <article class="card actor" id="master-send-block">
+          <div class="actor-head">
+            <div class="avatar avatar-alice"><i data-lucide="send"></i></div>
+            <div>
+              <h3>1. Chiffrement et Envoi</h3>
+              <span class="muted" id="target-summary">Aucune cible enregistrée</span>
             </div>
           </div>
 
-          <div id="pubkey-visible-panel" class="drawer visible">
+          <!-- Cible : nom + identifiant réseau -->
+          <div class="block">
+            <label class="label"><i data-lucide="user-round"></i> Cible</label>
+
+            <input type="text" id="recipient-name" placeholder="Nom de la cible (ex. Karim Koné)" maxlength="30" autocomplete="off">
+
             <div class="row-between">
-              <span class="badge badge-cyan" id="pubkey-owner">Clé publique (e, n)</span>
-              <button type="button" class="btn btn-outline btn-xs" id="btn-copy-trans-pubkey"><i data-lucide="copy"></i> Copier</button>
+              <label for="recipient-ip" class="label"><i data-lucide="globe"></i> Identifiant réseau</label>
+              <span id="target-ip-badge" class="badge">IP à saisir</span>
             </div>
-            <p class="field-name">Exposant e</p>
-            <code id="trans-bob-pubkey-e">—</code>
-            <p class="field-name">Module n</p>
-            <div class="mono-box" id="trans-bob-pubkey-n">Enregistre une cible pour générer ses clés.</div>
+            <div class="ip-group">
+              <span class="ip-tag">TCP://</span>
+              <input type="text" id="recipient-ip" placeholder="192.168.1.45:8080" autocomplete="off" spellcheck="false">
+            </div>
+
+            <select id="recipient-digits">
+              <option value="500" selected>Premiers de 500 chiffres</option>
+              <option value="250">Premiers de 250 chiffres</option>
+              <option value="100">Premiers de 100 chiffres</option>
+              <option value="50">Premiers de 50 chiffres</option>
+            </select>
+
+            <p class="small danger" id="recipient-error"></p>
+
+            <button type="button" class="btn btn-primary btn-sm" id="btn-create-recipient">
+              <i data-lucide="user-plus"></i> Enregistrer et générer les clés
+            </button>
+
+            <label for="recipient-select" class="label"><i data-lucide="users"></i> Cible active</label>
+            <select id="recipient-select"></select>
           </div>
 
-          <div id="pubkey-hidden-panel" class="drawer hidden">
-            <i data-lucide="lock"></i>
-            <span>Clé publique masquée. Choisis « Oui » pour l'afficher.</span>
+          <!-- Clé publique -->
+          <div class="block">
+            <div class="row-between">
+              <span class="label"><i data-lucide="circle-help"></i> Afficher la clé publique ?</span>
+              <div class="toggle">
+                <button type="button" class="toggle-btn active" id="btn-pubkey-opt-yes" data-choice="yes"><i data-lucide="eye"></i> Oui</button>
+                <button type="button" class="toggle-btn" id="btn-pubkey-opt-no" data-choice="no"><i data-lucide="eye-off"></i> Non</button>
+              </div>
+            </div>
+
+            <div id="pubkey-visible-panel" class="drawer visible">
+              <div class="row-between">
+                <span class="badge badge-cyan" id="pubkey-owner">Clé publique (e, n)</span>
+                <button type="button" class="btn btn-outline btn-xs" id="btn-copy-trans-pubkey"><i data-lucide="copy"></i> Copier</button>
+              </div>
+              <p class="field-name">Exposant e</p>
+              <code id="trans-bob-pubkey-e">—</code>
+              <p class="field-name">Module n</p>
+              <div class="mono-box" id="trans-bob-pubkey-n">Enregistre une cible pour générer ses clés.</div>
+            </div>
+
+            <div id="pubkey-hidden-panel" class="drawer hidden">
+              <i data-lucide="lock"></i>
+              <span>Clé publique masquée.</span>
+            </div>
           </div>
-        </div>
 
-        <!-- Clé privée (toujours cachée) -->
-        <div class="block block-danger">
-          <div class="row-between">
-            <span class="badge badge-rose"><i data-lucide="lock"></i> Clé privée d</span>
-            <span class="muted small"><i data-lucide="shield-alert"></i> Strictement cachée</span>
-          </div>
-          <div class="mono-box masked">••••••••••••••••••••••••••••••••</div>
-          <p class="muted small">Seule la cible détient d. Elle ne circule jamais sur le réseau.</p>
-        </div>
+          <!-- Message -->
+          <div class="block">
+            <label for="alice-message-input" class="label"><i data-lucide="mail"></i> Message secret</label>
 
-        <!-- Message -->
-        <div class="block">
-          <label for="alice-message-input" class="label"><i data-lucide="mail"></i> Message secret</label>
+            <div class="chips">
+              <button type="button" class="chip preset-chip" data-text="Transfert confidentiel : 2 500 000 € vers compte chiffré CH-99420."><i data-lucide="banknote"></i> Banque</button>
+              <button type="button" class="chip preset-chip" data-text="Activation d'urgence : Coordonnées 48°51'24''N, 2°21'07''E. Clé OMEGA-88."><i data-lucide="crosshair"></i> Mission</button>
+              <button type="button" class="chip preset-chip" data-text="Ce message est protégé par un cryptosystème à nombres premiers de 500 chiffres !"><i data-lucide="lock-keyhole"></i> Démo</button>
+            </div>
 
-          <div class="chips">
-            <button type="button" class="chip preset-chip" data-text="Transfert confidentiel : 2 500 000 € vers compte chiffré CH-99420."><i data-lucide="banknote"></i> Banque</button>
-            <button type="button" class="chip preset-chip" data-text="Activation d'urgence : Coordonnées 48°51'24''N, 2°21'07''E. Clé OMEGA-88."><i data-lucide="crosshair"></i> Mission</button>
-            <button type="button" class="chip preset-chip" data-text="Ce message est protégé par un cryptosystème à nombres premiers de 500 chiffres !"><i data-lucide="lock-keyhole"></i> Démo</button>
+            <textarea id="alice-message-input" rows="3" placeholder="Saisis le texte à crypter...">Ce message ultra-confidentiel est protégé par un cryptosystème à nombres premiers de 500 chiffres.</textarea>
+
+            <div class="row-between muted small">
+              <span id="alice-char-count">0 caractère</span>
+              <span id="alice-block-count">1 bloc RSA</span>
+            </div>
           </div>
 
-          <textarea id="alice-message-input" rows="3" placeholder="Saisis le texte à crypter...">Ce message ultra-confidentiel est protégé par un cryptosystème à nombres premiers de 500 chiffres.</textarea>
+          <!-- Envoi -->
+          <div class="block">
+            <button type="button" class="btn btn-primary btn-full" id="btn-encrypt-and-transmit" disabled>
+              <i data-lucide="send"></i> Chiffrer et envoyer vers la cible
+            </button>
 
-          <div class="row-between muted small">
-            <span id="alice-char-count">0 caractère</span>
-            <span id="alice-block-count">1 bloc RSA</span>
+            <div id="alice-ciphertext-preview" class="mono-box hidden"></div>
+
+            <div id="alice-dispatch-status" class="notice hidden">
+              <i data-lucide="radio-tower"></i>
+              <span id="alice-dispatch-text">Paquet chiffré envoyé</span>
+            </div>
           </div>
-        </div>
+        </article>
 
-        <!-- Envoi -->
-        <div class="block">
-          <button type="button" class="btn btn-primary btn-full" id="btn-encrypt-and-transmit" disabled>
-            <i data-lucide="send"></i> Chiffrer et envoyer
-          </button>
 
-          <div id="alice-ciphertext-preview" class="mono-box hidden"></div>
-
-          <div id="alice-dispatch-status" class="notice hidden">
-            <i data-lucide="radio-tower"></i>
-            <span id="alice-dispatch-text">Paquet chiffré envoyé</span>
+        <!-- COLONNE 2 : RÉCEPTION ET DÉCHIFFREMENT (CIBLE / BOB) -->
+        <article class="card actor" id="target-reception-block">
+          <div class="actor-head">
+            <div class="avatar avatar-bob"><i data-lucide="radio-receiver"></i></div>
+            <div>
+              <h3>2. Réception du message (Cible)</h3>
+              <span class="muted" id="target-inbox-owner">Boîte de réception vide</span>
+            </div>
           </div>
-        </div>
-      </article>
+
+          <!-- Message chiffré reçu -->
+          <div class="block">
+            <label class="label"><i data-lucide="lock"></i> Message reçu sous forme cryptée</label>
+            <p class="muted small">Le message arrive sur le réseau sous forme de blocs chiffrés illisibles sans la clé privée.</p>
+            <textarea id="target-received-ciphertext" class="mono" rows="6" readonly placeholder="En attente de réception d'un message chiffré..."></textarea>
+          </div>
+
+          <!-- Clé privée de la cible (cachée) -->
+          <div class="block block-danger">
+            <div class="row-between">
+              <span class="badge badge-rose"><i data-lucide="lock"></i> Clé privée secrète (d) de la cible</span>
+              <span class="muted small"><i data-lucide="shield-alert"></i> Strictement locale</span>
+            </div>
+            <div class="mono-box masked">••••••••••••••••••••••••••••••••</div>
+            <p class="muted small">Seule la cible possède la clé <code>d</code> nécessaire pour inverser le chiffrement.</p>
+          </div>
+
+          <!-- Action de déchiffrement -->
+          <div class="block">
+            <button type="button" class="btn btn-cyan btn-full" id="btn-target-decrypt" disabled>
+              <i data-lucide="lock-open"></i> Déchiffrer avec la clé privée (d)
+            </button>
+
+            <label class="label" style="margin-top: 12px;"><i data-lucide="file-text"></i> Message en clair restitué</label>
+            <textarea id="target-decrypted-output" rows="4" readonly placeholder="Le message déchiffré apparaîtra ici après action de la cible..."></textarea>
+          </div>
+        </article>
+
+      </div>
 
 
-      <!-- Historique -->
+      <!-- Journal des transmissions -->
       <section class="card">
         <h2 class="card-title"><i data-lucide="clock"></i> Journal des transmissions</h2>
 
@@ -190,176 +215,7 @@
     </main>
 
 
-    <!-- ============ ONGLET 2 : CLÉS ============ -->
-    <section id="tab-keys" class="tab-content">
-
-      <div class="card">
-        <h2 class="card-title"><i data-lucide="dices"></i> Générateur de nombres premiers (Miller-Rabin)</h2>
-        <p class="muted">Génération dans le navigateur avec BigInt. Trousseau de : <strong id="keys-owner">—</strong></p>
-
-        <div class="row">
-          <select id="select-prime-digits">
-            <option value="500" selected>500 chiffres (~3322 bits)</option>
-            <option value="250">250 chiffres (rapide)</option>
-            <option value="100">100 chiffres (très rapide)</option>
-            <option value="50">50 chiffres (instantané)</option>
-          </select>
-
-          <button type="button" class="btn btn-primary" id="btn-generate-keys"><i data-lucide="refresh-cw"></i> Générer une paire</button>
-        </div>
-
-        <div class="row">
-          <button type="button" class="btn btn-outline btn-sm" id="btn-restore-preset-keys"><i data-lucide="rotate-ccw"></i> Restaurer</button>
-          <button type="button" class="btn btn-outline btn-sm" id="btn-export-keys"><i data-lucide="download"></i> Exporter</button>
-          <button type="button" class="btn btn-outline btn-sm" id="btn-import-keys"><i data-lucide="upload"></i> Importer</button>
-          <input type="file" id="file-import-keys" accept=".json" hidden>
-        </div>
-      </div>
-
-
-      <div class="grid-2">
-
-        <div class="card">
-          <div class="row-between">
-            <h4><span class="badge badge-cyan">p</span> Premier nombre premier</h4>
-            <button type="button" class="btn btn-outline btn-xs" data-copy-target="display-p-val"><i data-lucide="copy"></i></button>
-          </div>
-          <div class="mono-box" id="display-p-val">Chargement...</div>
-          <p class="muted small">Taille : <strong id="badge-p-digits">500 chiffres</strong></p>
-        </div>
-
-        <div class="card">
-          <div class="row-between">
-            <h4><span class="badge badge-cyan">q</span> Second nombre premier</h4>
-            <button type="button" class="btn btn-outline btn-xs" data-copy-target="display-q-val"><i data-lucide="copy"></i></button>
-          </div>
-          <div class="mono-box" id="display-q-val">Chargement...</div>
-          <p class="muted small">Taille : <strong id="badge-q-digits">500 chiffres</strong></p>
-        </div>
-
-        <div class="card full">
-          <div class="row-between">
-            <h4><span class="badge badge-green">n</span> Module n = p × q</h4>
-            <button type="button" class="btn btn-outline btn-xs" data-copy-target="display-n-val"><i data-lucide="copy"></i></button>
-          </div>
-          <div class="mono-box" id="display-n-val">Chargement...</div>
-          <p class="muted small">Taille : <strong id="badge-n-digits">1000 chiffres (~3322 bits)</strong></p>
-        </div>
-
-        <div class="card">
-          <div class="row-between">
-            <h4><span class="badge badge-green">e</span> Exposant public</h4>
-            <button type="button" class="btn btn-outline btn-xs" data-copy-target="display-e-val"><i data-lucide="copy"></i></button>
-          </div>
-          <div class="mono-box" id="display-e-val">65537</div>
-          <p class="muted small">Nombre de Fermat F₄ = 2¹⁶ + 1</p>
-        </div>
-
-        <div class="card">
-          <div class="row-between">
-            <h4><span class="badge badge-rose">d</span> Exposant privé</h4>
-            <div class="row">
-              <button type="button" class="btn btn-outline btn-xs" id="btn-toggle-key-d-vis"><i data-lucide="eye"></i> Démasquer</button>
-              <button type="button" class="btn btn-outline btn-xs" data-copy-target="display-d-val"><i data-lucide="copy"></i></button>
-            </div>
-          </div>
-          <div class="mono-box masked-secret" id="display-d-val">••••••••••••••••••••••••••••••••</div>
-          <p class="small danger"><i data-lucide="lock"></i> Masquée par défaut · <span id="badge-d-digits">~1000 chiffres</span></p>
-        </div>
-
-      </div>
-    </section>
-
-
-    <!-- ============ ONGLET 3 : ATELIER ============ -->
-    <section id="tab-workspace" class="tab-content">
-      <div class="grid-2">
-
-        <div class="card">
-          <h2 class="card-title"><i data-lucide="lock"></i> Chiffrer un texte</h2>
-
-          <label for="direct-plaintext-input" class="label">Texte en clair</label>
-          <textarea id="direct-plaintext-input" rows="5" placeholder="Saisis un texte...">Transmission prioritaire : cryptosystème opérationnel.</textarea>
-
-          <label for="select-cipher-format" class="label">Format de sortie</label>
-          <select id="select-cipher-format">
-            <option value="json" selected>Paquet JSON (recommandé)</option>
-            <option value="decimal">Blocs décimaux bruts</option>
-            <option value="hex">Hexadécimal</option>
-          </select>
-
-          <button type="button" class="btn btn-primary btn-full" id="btn-direct-encrypt"><i data-lucide="lock"></i> Chiffrer</button>
-
-          <label for="direct-ciphertext-output" class="label">Résultat chiffré</label>
-          <textarea id="direct-ciphertext-output" class="mono" rows="6" readonly placeholder="Le chiffré apparaîtra ici..."></textarea>
-
-          <button type="button" class="btn btn-outline btn-sm" data-copy-target="direct-ciphertext-output"><i data-lucide="copy"></i> Copier</button>
-        </div>
-
-        <div class="card">
-          <h2 class="card-title"><i data-lucide="lock-open"></i> Déchiffrer un texte</h2>
-
-          <label for="direct-ciphertext-input" class="label">Texte chiffré (JSON, décimal ou hex)</label>
-          <textarea id="direct-ciphertext-input" class="mono" rows="6" placeholder="Colle le bloc chiffré ici..."></textarea>
-
-          <button type="button" class="btn btn-cyan btn-full" id="btn-direct-decrypt"><i data-lucide="lock-open"></i> Déchiffrer</button>
-
-          <label for="direct-decrypted-output" class="label">Message en clair</label>
-          <textarea id="direct-decrypted-output" rows="6" readonly placeholder="Le message apparaîtra ici..."></textarea>
-
-          <button type="button" class="btn btn-outline btn-sm" data-copy-target="direct-decrypted-output"><i data-lucide="copy"></i> Copier</button>
-        </div>
-
-      </div>
-    </section>
-
-
-    <!-- ============ ONGLET 4 : SÉCURITÉ ============ -->
-    <section id="tab-security" class="tab-content">
-
-      <div class="card">
-        <h2 class="card-title"><i data-lucide="shield-check"></i> Résistance des standards RSA</h2>
-        <p class="muted">La sécurité repose sur la difficulté de factoriser <code>n = p × q</code>.</p>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Clé</th><th>Chiffres de n</th><th>Bits</th><th>Statut</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>RSA-64</td><td>~19</td><td>64</td><td><span class="badge badge-rose">Cassé instantanément</span></td></tr>
-              <tr><td>RSA-512</td><td>155</td><td>512</td><td><span class="badge badge-rose">Cassé en 1999</span></td></tr>
-              <tr><td>RSA-1024</td><td>309</td><td>1024</td><td><span class="badge badge-rose">Déconseillé</span></td></tr>
-              <tr><td>RSA-2048</td><td>617</td><td>2048</td><td><span class="badge badge-green">Sécurisé</span></td></tr>
-              <tr class="highlight"><td>CRYPTO-500</td><td>1000</td><td>~3322</td><td><span class="badge badge-green">Inviolable par force brute</span></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-
-      <div class="card">
-        <h2 class="card-title"><i data-lucide="timer"></i> Démonstrateur de factorisation</h2>
-        <p class="muted">Le temps de calcul explose avec la taille du nombre.</p>
-
-        <div class="grid-2">
-          <div>
-            <label for="benchmark-number-input" class="label">Nombre à factoriser</label>
-            <input type="text" id="benchmark-number-input" value="1000000007">
-            <button type="button" class="btn btn-cyan btn-full" id="btn-benchmark-factor"><i data-lucide="play"></i> Lancer</button>
-          </div>
-
-          <div class="mono-box result-box">
-            <span class="muted small">Résultat :</span>
-            <div id="benchmark-result"><span class="muted">Clique sur « Lancer » pour tester.</span></div>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-
-    <!-- ============ ONGLET 5 : THÉORIE ============ -->
+    <!-- ============ ONGLET 2 : THÉORIE ============ -->
     <section id="tab-theory" class="tab-content">
       <div class="grid-2">
 

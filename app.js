@@ -7,12 +7,11 @@
   const short = (s, n = 220) => (s.length > n ? s.slice(0, n) + '… (' + s.length + ' chiffres)' : s);
 
   const IP_RE = /^(\d{1,3}\.){3}\d{1,3}(:\d{1,5})?$/;
-  const ID_RE = /^[A-Za-z0-9._-]{2,20}$/;   // identifiant : lettres, chiffres, . _ -
-  const recipients = [];    // { id, name, ip, keys, initial }
+  const recipients = [];    // { name, ip, keys, initial }
   let cur = null;           // destinataire sélectionné
   let keys = null;          // trousseau du destinataire courant
   let revealD = false;      // clé privée affichée dans l'onglet Clés
-  let cipher = null;        // blocs chiffrés
+  let cipher = null;        // blocs chiffrés par Alice
   let sentText = '';        // message en clair envoyé (vérification)
   let delivered = false;
 
@@ -32,6 +31,14 @@
   function flash(btn) {
     btn.style.color = 'var(--green)';
     setTimeout(() => (btn.style.color = ''), 900);
+  }
+
+  function logEve(text, cls) {
+    const d = document.createElement('div');
+    d.className = 'terminal-line ' + (cls || 'info');
+    d.textContent = text;
+    $('eve-terminal-log').append(d);
+    $('eve-terminal-log').scrollTop = 1e9;
   }
 
   // ---------- Fond animé ----------
@@ -118,20 +125,17 @@
   function setKeys(k) { keys = k; cur.keys = k; revealD = false; showKeys(); resetTransmission(); }
   async function generate(digits) { setKeys(await genWithModal(digits)); }
 
-  // ---------- Cibles (nom + identifiant réseau) ----------
-  const label = r => r.name + ' (' + r.ip + ')';
-  const NO_KEYS = 'Enregistre d\'abord une cible (nom + identifiant réseau).';
-
+  // ---------- Destinataires ----------
   function renderRecipient() {
     const sel = $('recipient-select');
     sel.replaceChildren(...recipients.map((r, i) => {
-      const o = document.createElement('option'); o.value = i; o.textContent = label(r); return o;
+      const o = document.createElement('option'); o.value = i; o.textContent = r.name + ' (' + r.ip + ')'; return o;
     }));
     sel.value = recipients.indexOf(cur);
-    $('target-summary').textContent = 'Destinataire : ' + label(cur);
+    $('bob-name').textContent = cur.name;
     $('pubkey-owner').textContent = 'Clé publique de ' + cur.name + ' (e, n)';
-    $('keys-owner').textContent = label(cur);
-    $('btn-encrypt-and-transmit').disabled = false;
+    $('keys-owner').textContent = cur.name;
+    setIp(cur.ip);
   }
 
   function selectRecipient(i) {
@@ -140,50 +144,43 @@
   }
 
   $('recipient-select').onchange = e => selectRecipient(+e.target.value);
-
-  // Badge de validation de l'identifiant réseau, en direct
-  $('recipient-ip').addEventListener('input', e => {
-    const v = e.target.value.trim(), b = $('target-ip-badge');
-    if (!v) { b.className = 'badge'; b.textContent = 'IP à saisir'; return; }
-    const ok = IP_RE.test(v);
-    b.className = 'badge ' + (ok ? 'badge-green' : 'badge-rose');
-    b.textContent = ok ? 'IP valide' : 'IP invalide';
-  });
+  $('btn-new-recipient').onclick = () => { $('recipient-form').classList.toggle('hidden'); $('recipient-name').focus(); };
+  $('btn-cancel-recipient').onclick = () => { $('recipient-form').classList.add('hidden'); $('recipient-error').textContent = ''; };
 
   $('btn-create-recipient').onclick = async () => {
     const name = $('recipient-name').value.trim(), ip = $('recipient-ip').value.trim(), err = $('recipient-error');
     err.textContent = '';
-    if (!name) { err.textContent = 'Saisis le nom de la cible.'; return; }
-    if (!ip) { err.textContent = 'Saisis l\'identifiant réseau de la cible.'; return; }
-    if (!IP_RE.test(ip)) { err.textContent = 'Identifiant réseau invalide (ex. 192.168.1.50:8080).'; return; }
-    if (recipients.some(r => r.ip === ip)) { err.textContent = 'Cet identifiant réseau est déjà enregistré.'; return; }
+    if (!name) { err.textContent = 'Donne un nom au destinataire.'; return; }
+    if (recipients.some(r => r.name.toLowerCase() === name.toLowerCase())) { err.textContent = 'Ce nom existe déjà.'; return; }
+    if (!IP_RE.test(ip)) { err.textContent = 'Adresse IP invalide (ex. 192.168.1.50:8080).'; return; }
     const btn = $('btn-create-recipient'); btn.disabled = true;
-    try {
-      const k = await genWithModal(parseInt($('recipient-digits').value, 10));
-      recipients.push({ name, ip, keys: k, initial: { ...k } });
-      $('recipient-name').value = ''; $('recipient-ip').value = '';
-      $('target-ip-badge').className = 'badge'; $('target-ip-badge').textContent = 'IP à saisir';
-      selectRecipient(recipients.length - 1);
-    } finally { btn.disabled = false; }
+    const k = await genWithModal(parseInt($('recipient-digits').value, 10));
+    recipients.push({ name, ip, keys: k, initial: { ...k } });
+    $('recipient-name').value = '';
+    $('recipient-form').classList.add('hidden');
+    btn.disabled = false;
+    selectRecipient(recipients.length - 1);
   };
 
   $('btn-generate-keys').onclick = async () => {
-    if (!cur) { alert(NO_KEYS); return; }
     const b = $('btn-generate-keys'); b.disabled = true;
     await generate(parseInt($('select-prime-digits').value, 10));
     b.disabled = false;
   };
 
-  $('btn-restore-preset-keys').onclick = () => { if (cur) setKeys({ ...cur.initial }); };
+  $('btn-restore-preset-keys').onclick = () => {
+    if (!cur) return;
+    setKeys({ ...cur.initial });
+  };
 
   $('btn-export-keys').onclick = () => {
     if (!keys) return;
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify({ version: 1, name: cur.name, ip: cur.ip, ...keys }, null, 2)], { type: 'application/json' }));
-    a.download = 'trousseau-rsa-' + cur.name.replace(/\W+/g, '_') + '.json'; a.click(); URL.revokeObjectURL(a.href);
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({ version: 1, ...keys }, null, 2)], { type: 'application/json' }));
+    a.download = 'trousseau-rsa.json'; a.click(); URL.revokeObjectURL(a.href);
   };
 
-  $('btn-import-keys').onclick = () => { if (!cur) { alert(NO_KEYS); return; } $('file-import-keys').click(); };
+  $('btn-import-keys').onclick = () => $('file-import-keys').click();
   $('file-import-keys').onchange = async e => {
     const f = e.target.files[0]; e.target.value = '';
     if (!f) return;
@@ -193,6 +190,19 @@
       setKeys({ p: String(k.p), q: String(k.q), n: String(k.n), e: String(k.e), d: String(k.d) });
     } catch (err) { alert('Import impossible : ' + err.message); }
   };
+
+  // ---------- Adresse IP ----------
+  function setIp(v) {
+    $('target-ip-input').value = v;
+    const ok = IP_RE.test(v.trim());
+    const b = $('target-ip-badge');
+    b.className = 'badge ' + (ok ? 'badge-green' : 'badge-rose');
+    b.textContent = ok ? 'IP prête' : 'IP invalide';
+    ['channel-dest-ip', 'eve-dest-ip-tag', 'bob-listen-ip-badge'].forEach(id => ($(id).textContent = v.trim() || '—'));
+    document.querySelectorAll('.chip[data-ip]').forEach(c => c.classList.toggle('active', c.dataset.ip === v.trim()));
+  }
+  $('target-ip-input').addEventListener('input', e => setIp(e.target.value));
+  document.querySelectorAll('.chip[data-ip]').forEach(c => c.addEventListener('click', () => setIp(c.dataset.ip)));
 
   // ---------- Clé publique : afficher / masquer ----------
   document.querySelectorAll('[data-choice]').forEach(b => b.addEventListener('click', () => {
@@ -205,7 +215,7 @@
     $('pubkey-hidden-panel').classList.toggle('visible', !yes);
   }));
 
-  // ---------- Message ----------
+  // ---------- Message d'Alice ----------
   function updateCounts() {
     const t = $('alice-message-input').value, bytes = new TextEncoder().encode(t).length;
     $('alice-char-count').textContent = t.length + ' caractère' + (t.length > 1 ? 's' : '');
@@ -219,57 +229,119 @@
     $('alice-message-input').value = c.dataset.text; updateCounts();
   }));
 
-  // ---------- Chiffrement + envoi vers la cible active ----------
-  function addHistory(time, target, text, size, ip, status, ok) {
-    const tr = document.createElement('tr');
-    [time, target, text, size, ip, status].forEach((c, i) => {
+  // ---------- Transmission Alice -> Ève -> Bob ----------
+  async function encryptAlice() {
+    const text = $('alice-message-input').value;
+    if (!text.trim() || !keys) return false;
+    $('btn-encrypt-alice').disabled = true;
+    await wait(30);
+    sentText = text;
+    cipher = C.encrypt(text, keys);
+    const box = $('alice-ciphertext-preview');
+    box.classList.remove('hidden');
+    box.textContent = 'C = Mᵉ mod n (' + cipher.length + ' bloc' + (cipher.length > 1 ? 's' : '') + ')\n' + short(cipher[0], 300);
+    $('btn-transmit').disabled = false;
+    $('btn-encrypt-alice').disabled = false;
+    return true;
+  }
+
+  async function transmit() {
+    if (!cipher) return;
+    $('btn-transmit').disabled = true;
+    const ip = $('target-ip-input').value.trim();
+    const dispatch = $('alice-dispatch-status');
+    dispatch.classList.remove('hidden');
+    $('alice-dispatch-text').textContent = 'Envoi du paquet chiffré vers ' + ip + '...';
+    $('channel-status-label').textContent = 'Transmission en cours';
+    const pk = $('wire-packet'); pk.classList.add('active');
+    await wait(1500);
+    pk.classList.remove('active');
+    $('channel-status-label').textContent = 'Paquet livré';
+    $('alice-dispatch-text').textContent = 'Paquet chiffré livré à ' + ip;
+
+    const preview = cipher.length + ' bloc(s)\n' + short(cipher[0], 300);
+    $('eve-captured-data').textContent = preview;
+    $('eve-status-badge').textContent = 'Paquet intercepté';
+    $('btn-eve-attack').disabled = false;
+    logEve('[ÈVE] Paquet intercepté (' + cipher.length + ' bloc(s)). Illisible sans la clé privée d.', 'warn');
+
+    $('bob-received-cipher').textContent = preview;
+    $('btn-decrypt-bob').disabled = false;
+    delivered = true;
+
+    const tb = $('history-table-body'), tr = document.createElement('tr');
+    const cells = [new Date().toLocaleTimeString('fr-FR'), sentText.slice(0, 40) + (sentText.length > 40 ? '…' : ''),
+      cipher.reduce((s, b) => s + b.length, 0) + ' chiffres', ip, 'Livré'];
+    cells.forEach((c, i) => {
       const td = document.createElement('td');
-      if (i === 2) { const code = document.createElement('code'); code.textContent = c; td.append(code); }
-      else if (i >= 4) { const s = document.createElement('span'); s.className = 'badge ' + (i === 4 ? 'badge-purple' : (ok ? 'badge-green' : 'badge-rose')); s.textContent = c; td.append(s); }
+      if (i === 1) { const code = document.createElement('code'); code.textContent = c; td.append(code); }
+      else if (i >= 3) { const s = document.createElement('span'); s.className = 'badge ' + (i === 3 ? 'badge-purple' : 'badge-green'); s.textContent = c; td.append(s); }
       else td.textContent = c;
       tr.append(td);
     });
-    $('history-table-body').prepend(tr);
+    tb.prepend(tr);
   }
 
-  async function sendMessage() {
-    const text = $('alice-message-input').value;
-    if (!keys || !cur) { $('alice-dispatch-status').classList.remove('hidden'); $('alice-dispatch-text').textContent = NO_KEYS; return; }
-    if (!text.trim()) return;
-    const btn = $('btn-encrypt-and-transmit'); btn.disabled = true;
-    const target = cur, k = keys;
-    const dispatch = $('alice-dispatch-status');
-    await wait(30);
-    const blocks = C.encrypt(text, k);
-    const box = $('alice-ciphertext-preview');
-    box.classList.remove('hidden');
-    box.textContent = 'C = Mᵉ mod n (' + blocks.length + ' bloc' + (blocks.length > 1 ? 's' : '') + ')\n' + short(blocks[0], 300);
-    dispatch.classList.remove('hidden');
-    $('alice-dispatch-text').textContent = 'Envoi du paquet chiffré vers ' + target.name + ' (' + target.ip + ')...';
-    await wait(1200);
+  $('btn-encrypt-alice').onclick = encryptAlice;
+  $('btn-transmit').onclick = transmit;
+  $('btn-encrypt-and-transmit').onclick = async () => {
+    const b = $('btn-encrypt-and-transmit'); b.disabled = true;
+    if (await encryptAlice()) await transmit();
+    b.disabled = false;
+  };
 
-    // Contrôle d'intégrité : déchiffrement avec la clé privée de la cible
-    let ok = false;
-    try { ok = C.decrypt(blocks, k) === text; } catch (_) {}
-    $('alice-dispatch-text').textContent = ok
-      ? 'Livré à ' + target.name + ' (' + target.ip + ') : déchiffré sans altération'
-      : 'Échec du contrôle d\'intégrité';
-    addHistory(new Date().toLocaleTimeString('fr-FR'), target.name, text.slice(0, 40) + (text.length > 40 ? '…' : ''),
-      blocks.reduce((s, b) => s + b.length, 0) + ' chiffres', target.ip, ok ? 'Livré' : 'Erreur', ok);
-    btn.disabled = false;
-  }
-  $('btn-encrypt-and-transmit').onclick = sendMessage;
+  // Attaque d'Ève (simulation pédagogique)
+  $('btn-eve-attack').onclick = async () => {
+    const btn = $('btn-eve-attack'); btn.disabled = true;
+    const digits = keys.n.length, lnN = digits * Math.LN10;
+    const log10ops = 1.923 * Math.cbrt(lnN) * Math.pow(Math.log(lnN), 2 / 3) / Math.LN10;
+    const years = Math.pow(10, log10ops - 18) / 3.15e7;
+    logEve('[ÈVE] Objectif : factoriser n (' + digits + ' chiffres) pour retrouver p, q puis d.');
+    await wait(700);
+    logEve('[ÈVE] Divisions d\'essai jusqu\'à 10⁶ ... aucun facteur trouvé.', 'warn');
+    await wait(900);
+    logEve('[ÈVE] Lancement du crible GNFS. Estimation : ≈ 10^' + log10ops.toFixed(0) + ' opérations.');
+    await wait(900);
+    logEve('[ÈVE] À 10¹⁸ opérations/s : ≈ 10^' + Math.log10(years).toFixed(1) + ' ans de calcul.', 'warn');
+    await wait(700);
+    logEve('[ÈVE] ÉCHEC : impossible de retrouver la clé privée en un temps réaliste.', 'error');
+    $('eve-status-badge').textContent = 'Attaque échouée';
+  };
+
+  // Déchiffrement de Bob
+  $('btn-decrypt-bob').onclick = async () => {
+    if (!delivered) return;
+    const out = $('bob-decrypted-output');
+    out.textContent = 'Déchiffrement en cours...';
+    await wait(40);
+    try {
+      const text = C.decrypt(cipher, keys);
+      out.textContent = text;
+      $('bob-verified-badge').classList.toggle('hidden', text !== sentText);
+      icons();
+    } catch (err) { out.textContent = 'Erreur : ' + err.message; }
+  };
 
   function resetTransmission() {
+    cipher = null; sentText = ''; delivered = false;
     $('alice-ciphertext-preview').classList.add('hidden');
     $('alice-dispatch-status').classList.add('hidden');
+    $('btn-transmit').disabled = true; $('btn-eve-attack').disabled = true; $('btn-decrypt-bob').disabled = true;
+    $('channel-status-label').textContent = 'En attente';
+    $('eve-captured-data').textContent = 'En attente d\'une transmission...';
+    $('eve-status-badge').textContent = 'Aucun paquet';
+    $('bob-received-cipher').textContent = 'En attente de réception...';
+    $('bob-decrypted-output').textContent = 'En attente du déchiffrement...';
+    $('bob-verified-badge').classList.add('hidden');
+    $('eve-terminal-log').replaceChildren();
+    logEve('[ÈVE] En écoute sur le réseau...');
   }
+  $('btn-reset-trans').onclick = resetTransmission;
 
   // ---------- Atelier libre ----------
   $('btn-direct-encrypt').onclick = async () => {
     const t = $('direct-plaintext-input').value;
     if (!t) return;
-    if (!keys) { $('direct-ciphertext-output').value = NO_KEYS; return; }
     const out = $('direct-ciphertext-output');
     out.value = 'Chiffrement...'; await wait(30);
     out.value = C.formatBlocks(C.encrypt(t, keys), $('select-cipher-format').value);
@@ -277,7 +349,6 @@
 
   $('btn-direct-decrypt').onclick = async () => {
     const out = $('direct-decrypted-output');
-    if (!keys) { out.value = NO_KEYS; return; }
     out.value = 'Déchiffrement...'; await wait(30);
     try { out.value = C.decrypt(C.parseBlocks($('direct-ciphertext-input').value), keys); }
     catch (err) { out.value = 'Erreur : ' + err.message; }
@@ -298,7 +369,12 @@
   };
 
   // ---------- Démarrage ----------
+  setIp($('target-ip-input').value);
   updateCounts();
   resetTransmission();
   icons();
+  genWithModal(500).then(k => {
+    recipients.push({ name: 'Bob', ip: '192.168.1.45:8080', keys: k, initial: { ...k } });
+    selectRecipient(0);
+  });
 })();
