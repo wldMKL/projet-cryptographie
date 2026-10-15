@@ -106,20 +106,24 @@
     sel.value = recipients.indexOf(cur);
   }
 
+  let lastRecv = null;     // { r, blocks } : dernier message reçu par une identité locale
   function resetReception() {
     sentText = '';
     $('alice-ciphertext-preview').classList.add('hidden');
     $('alice-dispatch-status').classList.add('hidden');
-    $('target-received-ciphertext').value = '';
-    $('target-decrypted-output').value = '';
-    $('btn-target-decrypt').disabled = true;
+  }
+  function inboxLabel() {
+    if (lastRecv) return;
+    $('target-inbox-owner').textContent = recipients.some(r => r.keys.d)
+      ? 'En écoute : aucun message reçu'
+      : 'Aucune identité sur ce PC : enregistre une cible ici pour recevoir';
   }
 
   function showCurrent() {
     if (!cur) return;
     const k = cur.keys;
     $('target-summary').textContent = cur.name + ' · ' + cur.ip;
-    $('target-inbox-owner').textContent = k.d ? 'Boîte de réception de ' + cur.name : cur.name + ' : cible distante (clé privée sur son PC)';
+    inboxLabel();
     $('pubkey-owner').textContent = 'Clé publique de ' + cur.name + ' (e, n)';
     $('trans-bob-pubkey-e').textContent = k.e;
     $('trans-bob-pubkey-n').textContent = k.n;
@@ -238,10 +242,10 @@
         const m = await api('/receive?n=' + r.keys.n);
         if (m.id && m.id !== seen[r.keys.n]) {
           seen[r.keys.n] = m.id;
-          selectRecipient(recipients.indexOf(r));
-          $('target-received-ciphertext').value = C.formatBlocks(m.blocks.map(String), 'json');
+          lastRecv = { r, blocks: m.blocks.map(String) };
+          $('target-received-ciphertext').value = C.formatBlocks(lastRecv.blocks, 'json');
           $('target-decrypted-output').value = '';
-          $('target-inbox-owner').textContent = 'Nouveau message reçu pour ' + r.name;
+          $('target-inbox-owner').textContent = 'Message chiffré reçu pour ' + r.name + ' à ' + new Date().toLocaleTimeString('fr-FR');
           $('btn-target-decrypt').disabled = false;
         }
       }
@@ -251,10 +255,10 @@
   // ---------- Déchiffrement (cible) ----------
   $('btn-target-decrypt').onclick = async () => {
     const out = $('target-decrypted-output');
-    if (!cur || !cur.keys.d) { out.value = 'Clé privée absente sur ce PC.'; return; }
+    if (!lastRecv) { out.value = 'Aucun message reçu.'; return; }
     out.value = 'Déchiffrement en cours...';
     await wait(40);
-    try { out.value = C.decrypt(C.parseBlocks($('target-received-ciphertext').value), cur.keys); }
+    try { out.value = C.decrypt(lastRecv.blocks, lastRecv.r.keys); }
     catch (err) { out.value = 'Erreur : ' + err.message; }
   };
 
@@ -263,6 +267,7 @@
     for (const r of JSON.parse(localStorage.getItem(LS) || '[]')) { recipients.push(r); publish(r); }
   } catch (e) {}
   if (recipients.length) selectRecipient(0);
+  inboxLabel();
   updateCounts();
   checkIp();
   icons();

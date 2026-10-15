@@ -26,8 +26,9 @@ app.get('/pubkeys', (req, res) => res.json(Object.values(pubkeys)));
 app.post('/send', (req, res) => {
   const { n, blocks } = req.body || {};
   if (!n || !Array.isArray(blocks) || !blocks.length) return res.status(400).json({ success: false });
-  inbox[n] = { id: ++seq, blocks, at: Date.now() };
-  res.json({ success: true, id: seq });
+  const id = Date.now() + '-' + (++seq);
+  inbox[n] = { id, blocks, at: Date.now() };
+  res.json({ success: true, id });
 });
 
 // Lecture de la boîte de la cible : /receive?n=...
