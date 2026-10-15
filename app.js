@@ -106,7 +106,7 @@
     sel.value = recipients.indexOf(cur);
   }
 
-  let lastRecv = null;     // { r, blocks } : dernier message reçu par une identité locale
+  let lastRecv = null;     // { r, blocks, id } : dernier message reçu par une identité locale
   function resetReception() {
     sentText = '';
     $('alice-ciphertext-preview').classList.add('hidden');
@@ -184,19 +184,35 @@
     $('alice-message-input').value = c.dataset.text; updateCounts();
   }));
 
-  // ---------- Chiffrement + envoi réseau ----------
-  function addHistory(target, text, size, ip, status, ok) {
-    const tr = document.createElement('tr');
-    [new Date().toLocaleTimeString('fr-FR'), target, text, size, ip, status].forEach((c, i) => {
-      const td = document.createElement('td');
-      if (i === 2) { const code = document.createElement('code'); code.textContent = c; td.append(code); }
-      else if (i >= 4) { const s = document.createElement('span'); s.className = 'badge ' + (i === 4 ? 'badge-purple' : ok ? 'badge-green' : 'badge-rose'); s.textContent = c; td.append(s); }
-      else td.textContent = c;
-      tr.append(td);
-    });
-    $('history-table-body').prepend(tr);
+  // ---------- Journal partagé (identique sur tous les PC) ----------
+  const localFails = [];   // échecs d'envoi : le serveur n'a rien reçu
+  let journalSig = '';
+
+  function renderJournal(list) {
+    const rows = [...localFails, ...list];
+    const sig = JSON.stringify(rows.map(e => [e.id, e.status]));
+    if (sig === journalSig) return;   // rien de neuf : on ne redessine pas
+    journalSig = sig;
+
+    $('history-table-body').replaceChildren(...rows.map(e => {
+      const ok = e.status !== 'Échec';
+      const tr = document.createElement('tr');
+      [new Date(e.at).toLocaleTimeString('fr-FR'), e.target, e.preview, e.size, e.ip, e.status].forEach((c, i) => {
+        const td = document.createElement('td');
+        if (i === 2) { const code = document.createElement('code'); code.textContent = c; td.append(code); }
+        else if (i >= 4) {
+          const s = document.createElement('span');
+          s.className = 'badge ' + (i === 4 ? 'badge-purple' : ok ? 'badge-green' : 'badge-rose');
+          s.textContent = c; td.append(s);
+        }
+        else td.textContent = c;
+        tr.append(td);
+      });
+      return tr;
+    }));
   }
 
+  // ---------- Chiffrement + envoi réseau ----------
   $('btn-encrypt-and-transmit').onclick = async () => {
     const text = $('alice-message-input').value;
     if (!cur || !text.trim()) return;
@@ -214,12 +230,20 @@
       status.textContent = 'Envoi du paquet chiffré vers ' + target.ip + '...';
 
       let ok = true;
-      try { await api('/send', { n: target.keys.n, blocks: cipher }); }
+      try { await api('/send', { n: target.keys.n, blocks: cipher, name: target.name, ip: target.ip }); }
       catch (e) { ok = false; status.textContent = 'Échec de l\'envoi : serveur injoignable (' + e.message + ')'; }
-      if (ok) status.textContent = 'Paquet chiffré livré à ' + target.ip;
 
-      addHistory(target.name, text.slice(0, 40) + (text.length > 40 ? '…' : ''),
-        cipher.reduce((s, b) => s + b.length, 0) + ' chiffres', target.ip, ok ? 'Livré' : 'Échec', ok);
+      if (ok) {
+        status.textContent = 'Paquet chiffré livré à ' + target.ip;
+        poll();   // rafraîchit le journal immédiatement
+      } else {
+        localFails.unshift({
+          id: 'local-' + Date.now(), at: Date.now(), target: target.name,
+          ip: target.ip, preview: short(cipher[0], 24), status: 'Échec',
+          size: cipher.reduce((s, b) => s + b.length, 0) + ' chiffres'
+        });
+        renderJournal([]);
+      }
       icons();
     } finally { btn.disabled = false; }
   };
@@ -227,6 +251,9 @@
   // ---------- Réception : interrogation du serveur ----------
   async function poll() {
     try {
+      // 0. Journal commun
+      renderJournal(await api('/journal'));
+
       // 1. Nouvelles cibles publiées par d'autres PC (clé publique seulement)
       let added = false;
       for (const k of await api('/pubkeys')) {
@@ -242,7 +269,7 @@
         const m = await api('/receive?n=' + r.keys.n);
         if (m.id && m.id !== seen[r.keys.n]) {
           seen[r.keys.n] = m.id;
-          lastRecv = { r, blocks: m.blocks.map(String) };
+          lastRecv = { r, blocks: m.blocks.map(String), id: m.id };
           $('target-received-ciphertext').value = C.formatBlocks(lastRecv.blocks, 'json');
           $('target-decrypted-output').value = '';
           $('target-inbox-owner').textContent = 'Message chiffré reçu pour ' + r.name + ' à ' + new Date().toLocaleTimeString('fr-FR');
@@ -258,7 +285,10 @@
     if (!lastRecv) { out.value = 'Aucun message reçu.'; return; }
     out.value = 'Déchiffrement en cours...';
     await wait(40);
-    try { out.value = C.decrypt(lastRecv.blocks, lastRecv.r.keys); }
+    try {
+      out.value = C.decrypt(lastRecv.blocks, lastRecv.r.keys);
+      api('/ack', { id: lastRecv.id }).then(poll).catch(() => {});   // statut « Déchiffré » sur tous les PC
+    }
     catch (err) { out.value = 'Erreur : ' + err.message; }
   };
 
