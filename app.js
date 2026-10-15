@@ -1,4 +1,4 @@
-/* CRYPTO-500 : logique de l'interface (alignée sur index.html) */
+/* CRYPTO-500 : logique de l'interface + transmission réseau */
 (function () {
   const C = window.Crypto500;
   const $ = id => document.getElementById(id);
@@ -6,11 +6,28 @@
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const short = (s, n = 220) => (s.length > n ? s.slice(0, n) + '… (' + s.length + ' chiffres)' : s);
   const IP_RE = /^(\d{1,3}\.){3}\d{1,3}(:\d{1,5})?$/;
+  const LS = 'crypto500-local';
 
-  const recipients = [];   // { name, ip, keys }
-  let cur = null;          // cible active
-  let cipher = null;       // blocs chiffrés
+  const recipients = [];   // { name, ip, keys }  (keys.d présent = cible locale)
+  let cur = null;
   let sentText = '';
+  const seen = {};         // n -> dernier id de message affiché
+
+  // ---------- Réseau ----------
+  async function api(path, body) {
+    const r = await fetch(path, body
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      : undefined);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+  const publish = r => api('/pubkey', { name: r.name, ip: r.ip, e: r.keys.e, n: r.keys.n }).catch(() => {});
+
+  function persist() {
+    try {
+      localStorage.setItem(LS, JSON.stringify(recipients.filter(r => r.keys.d).map(r => ({ name: r.name, ip: r.ip, keys: r.keys }))));
+    } catch (e) {}
+  }
 
   async function copyText(t) {
     try { await navigator.clipboard.writeText(t); }
@@ -82,16 +99,27 @@
   function renderRecipients() {
     const sel = $('recipient-select');
     sel.replaceChildren(...recipients.map((r, i) => {
-      const o = document.createElement('option'); o.value = i; o.textContent = r.name + ' (' + r.ip + ')'; return o;
+      const o = document.createElement('option');
+      o.value = i; o.textContent = r.name + ' (' + r.ip + ')' + (r.keys.d ? ' · local' : ' · distant');
+      return o;
     }));
     sel.value = recipients.indexOf(cur);
+  }
+
+  function resetReception() {
+    sentText = '';
+    $('alice-ciphertext-preview').classList.add('hidden');
+    $('alice-dispatch-status').classList.add('hidden');
+    $('target-received-ciphertext').value = '';
+    $('target-decrypted-output').value = '';
+    $('btn-target-decrypt').disabled = true;
   }
 
   function showCurrent() {
     if (!cur) return;
     const k = cur.keys;
     $('target-summary').textContent = cur.name + ' · ' + cur.ip;
-    $('target-inbox-owner').textContent = 'Boîte de réception de ' + cur.name;
+    $('target-inbox-owner').textContent = k.d ? 'Boîte de réception de ' + cur.name : cur.name + ' : cible distante (clé privée sur son PC)';
     $('pubkey-owner').textContent = 'Clé publique de ' + cur.name + ' (e, n)';
     $('trans-bob-pubkey-e').textContent = k.e;
     $('trans-bob-pubkey-n').textContent = k.n;
@@ -112,7 +140,10 @@
     const btn = $('btn-create-recipient'); btn.disabled = true;
     try {
       const keys = await genWithModal(parseInt($('recipient-digits').value, 10));
-      recipients.push({ name, ip, keys });
+      const r = { name, ip, keys };
+      recipients.push(r);
+      persist();
+      publish(r);   // la clé publique devient visible sur les autres PC
       $('recipient-name').value = '';
       selectRecipient(recipients.length - 1);
     } finally { btn.disabled = false; }
@@ -149,61 +180,78 @@
     $('alice-message-input').value = c.dataset.text; updateCounts();
   }));
 
-  // ---------- Chiffrement + envoi ----------
-  function resetReception() {
-    cipher = null; sentText = '';
-    $('alice-ciphertext-preview').classList.add('hidden');
-    $('alice-dispatch-status').classList.add('hidden');
-    $('target-received-ciphertext').value = '';
-    $('target-decrypted-output').value = '';
-    $('btn-target-decrypt').disabled = true;
+  // ---------- Chiffrement + envoi réseau ----------
+  function addHistory(target, text, size, ip, status, ok) {
+    const tr = document.createElement('tr');
+    [new Date().toLocaleTimeString('fr-FR'), target, text, size, ip, status].forEach((c, i) => {
+      const td = document.createElement('td');
+      if (i === 2) { const code = document.createElement('code'); code.textContent = c; td.append(code); }
+      else if (i >= 4) { const s = document.createElement('span'); s.className = 'badge ' + (i === 4 ? 'badge-purple' : ok ? 'badge-green' : 'badge-rose'); s.textContent = c; td.append(s); }
+      else td.textContent = c;
+      tr.append(td);
+    });
+    $('history-table-body').prepend(tr);
   }
 
   $('btn-encrypt-and-transmit').onclick = async () => {
     const text = $('alice-message-input').value;
     if (!cur || !text.trim()) return;
     const btn = $('btn-encrypt-and-transmit'); btn.disabled = true;
+    const target = cur, status = $('alice-dispatch-text');
     try {
-      const ip = cur.ip, box = $('alice-ciphertext-preview');
       await wait(30);
       sentText = text;
-      cipher = C.encrypt(text, cur.keys);
+      const cipher = C.encrypt(text, target.keys);
+      const box = $('alice-ciphertext-preview');
       box.classList.remove('hidden');
       box.textContent = 'C = Mᵉ mod n (' + cipher.length + ' bloc' + (cipher.length > 1 ? 's' : '') + ')\n' + short(cipher[0], 300);
 
       $('alice-dispatch-status').classList.remove('hidden');
-      $('alice-dispatch-text').textContent = 'Envoi du paquet chiffré vers ' + ip + '...';
-      await wait(1200);
-      $('alice-dispatch-text').textContent = 'Paquet chiffré livré à ' + ip;
+      status.textContent = 'Envoi du paquet chiffré vers ' + target.ip + '...';
 
-      $('target-received-ciphertext').value = C.formatBlocks(cipher, 'json');
-      $('target-decrypted-output').value = '';
-      $('btn-target-decrypt').disabled = false;
+      let ok = true;
+      try { await api('/send', { n: target.keys.n, blocks: cipher }); }
+      catch (e) { ok = false; status.textContent = 'Échec de l\'envoi : serveur injoignable (' + e.message + ')'; }
+      if (ok) status.textContent = 'Paquet chiffré livré à ' + target.ip;
 
-      const tr = document.createElement('tr');
-      const cells = [
-        new Date().toLocaleTimeString('fr-FR'),
-        cur.name,
-        sentText.slice(0, 40) + (sentText.length > 40 ? '…' : ''),
-        cipher.reduce((s, b) => s + b.length, 0) + ' chiffres',
-        ip,
-        'Livré'
-      ];
-      cells.forEach((c, i) => {
-        const td = document.createElement('td');
-        if (i === 2) { const code = document.createElement('code'); code.textContent = c; td.append(code); }
-        else if (i >= 4) { const s = document.createElement('span'); s.className = 'badge ' + (i === 4 ? 'badge-purple' : 'badge-green'); s.textContent = c; td.append(s); }
-        else td.textContent = c;
-        tr.append(td);
-      });
-      $('history-table-body').prepend(tr);
+      addHistory(target.name, text.slice(0, 40) + (text.length > 40 ? '…' : ''),
+        cipher.reduce((s, b) => s + b.length, 0) + ' chiffres', target.ip, ok ? 'Livré' : 'Échec', ok);
       icons();
     } finally { btn.disabled = false; }
   };
 
+  // ---------- Réception : interrogation du serveur ----------
+  async function poll() {
+    try {
+      // 1. Nouvelles cibles publiées par d'autres PC (clé publique seulement)
+      let added = false;
+      for (const k of await api('/pubkeys')) {
+        if (!recipients.some(r => r.keys.n === k.n)) {
+          recipients.push({ name: k.name || 'Distant', ip: k.ip || '', keys: { n: k.n, e: k.e } });
+          added = true;
+        }
+      }
+      if (added) { if (cur) renderRecipients(); else selectRecipient(0); }
+
+      // 2. Messages destinés aux cibles locales (celles dont ce PC détient d)
+      for (const r of recipients.filter(x => x.keys.d)) {
+        const m = await api('/receive?n=' + r.keys.n);
+        if (m.id && m.id !== seen[r.keys.n]) {
+          seen[r.keys.n] = m.id;
+          selectRecipient(recipients.indexOf(r));
+          $('target-received-ciphertext').value = C.formatBlocks(m.blocks.map(String), 'json');
+          $('target-decrypted-output').value = '';
+          $('target-inbox-owner').textContent = 'Nouveau message reçu pour ' + r.name;
+          $('btn-target-decrypt').disabled = false;
+        }
+      }
+    } catch (e) { /* serveur injoignable : on réessaiera */ }
+  }
+
   // ---------- Déchiffrement (cible) ----------
   $('btn-target-decrypt').onclick = async () => {
     const out = $('target-decrypted-output');
+    if (!cur || !cur.keys.d) { out.value = 'Clé privée absente sur ce PC.'; return; }
     out.value = 'Déchiffrement en cours...';
     await wait(40);
     try { out.value = C.decrypt(C.parseBlocks($('target-received-ciphertext').value), cur.keys); }
@@ -211,7 +259,13 @@
   };
 
   // ---------- Démarrage ----------
+  try {
+    for (const r of JSON.parse(localStorage.getItem(LS) || '[]')) { recipients.push(r); publish(r); }
+  } catch (e) {}
+  if (recipients.length) selectRecipient(0);
   updateCounts();
   checkIp();
   icons();
+  poll();
+  setInterval(poll, 2500);
 })();
