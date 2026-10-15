@@ -1,6 +1,7 @@
 /* CRYPTO-500 : moteur RSA (BigInt). Exposé via window.Crypto500 */
 (function () {
   const tick = () => new Promise(r => setTimeout(r));
+  const PRIME_DIGITS = 500;   // taille imposée de p et q
 
   // ---------- Outils mathématiques ----------
   function rnd(bits) {
@@ -69,7 +70,11 @@
   }
 
   // Paire de clés RSA. onStatus(phase, count, candidat)
+  // Seuls des premiers de 500 chiffres sont autorisés.
   async function genKeys(digits, onStatus) {
+    if (digits !== PRIME_DIGITS) {
+      throw new Error('Seuls les nombres premiers de ' + PRIME_DIGITS + ' chiffres sont autorisés');
+    }
     const e = 65537n;
     let p, q, phi;
     do {

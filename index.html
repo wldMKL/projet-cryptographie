@@ -73,12 +73,8 @@
               <input type="text" id="recipient-ip" placeholder="192.168.1.45:8080" autocomplete="off" spellcheck="false">
             </div>
 
-            <select id="recipient-digits">
-              <option value="500" selected>Premiers de 500 chiffres</option>
-              <option value="250">Premiers de 250 chiffres</option>
-              <option value="100">Premiers de 100 chiffres</option>
-              <option value="50">Premiers de 50 chiffres</option>
-            </select>
+            <!-- Taille imposée : p et q font toujours 500 chiffres -->
+            <p class="small muted"><i data-lucide="hash"></i> Clés RSA : p et q premiers de 500 chiffres</p>
 
             <p class="small danger" id="recipient-error"></p>
 
