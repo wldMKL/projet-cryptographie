@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Messagerie RSA</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>Messagerie chiffrée RSA</h1>
+  <p class="sub">Chaque utilisateur s'inscrit, génère ses clés (p et q de 500 chiffres), chiffre un message pour un autre utilisateur et déchiffre ceux qu'il reçoit. Basé sur le cours : chapitres 5 et 6.</p>
+
+  <div class="warn" id="warn" hidden></div>
+
+  <!-- Étape 0 : Inscription / Connexion -->
+  <section class="card" id="reg" style="max-width:520px">
+    <div class="tabs-nav">
+      <button type="button" class="tab-btn active" id="tab-reg-btn">S'inscrire</button>
+      <button type="button" class="tab-btn" id="tab-login-btn">Se connecter</button>
+    </div>
+    <h2 id="auth-title"><span class="n">0</span>Inscription</h2>
+    <p class="f" id="auth-desc">Choisis un pseudo pour rejoindre l'annuaire</p>
+    <label for="pseudo">Pseudo</label>
+    <input id="pseudo" maxlength="20" autocomplete="off" placeholder="ex : alice">
+    <div class="row">
+      <button id="go" disabled>S'inscrire</button>
+      <span class="st" id="rst">Connexion au serveur…</span>
+    </div>
+    <div class="switch-link" id="auth-switch">
+      <span>Déjà un compte ? </span><a href="#" id="link-switch">Se connecter</a>
+    </div>
+  </section>
+
+  <!-- Application principale (masquée tant que non connecté) -->
+  <div id="app" hidden>
+    <div class="bar">
+      <div class="user-badge">
+        <span class="user-avatar" id="avatar"></span>
+        <div>
+          <div class="user-label">Connecté en tant que</div>
+          <div class="user-name" id="me"></div>
+        </div>
+      </div>
+      <button class="s" id="bye">Se déconnecter</button>
+    </div>
+
+    <div class="cols">
+
+      <!-- Carte 1 : Mes clés -->
+      <section class="card a">
+        <h2><span class="n">1</span>Mes clés</h2>
+        <p class="f">n = p·q | φ(n) = (p−1)(q−1) | pgcd(e, φ) = 1 | d·e ≡ 1 (mod φ)</p>
+        <div class="row" style="margin-top:0">
+          <button id="gen">Générer mes clés</button>
+          <span class="st" id="gst"></span>
+        </div>
+        <div class="g">
+          <div>
+            <label for="kn">Clé publique : n <span id="cn"></span></label>
+            <textarea id="kn" rows="3" readonly></textarea>
+            <label for="ke">Clé publique : e</label>
+            <textarea id="ke" rows="1" readonly></textarea>
+          </div>
+          <div>
+            <label for="kd">Clé privée : d <span id="cd"></span></label>
+            <textarea id="kd" rows="3" readonly></textarea>
+          </div>
+        </div>
+        <details>
+          <summary>Valeurs secrètes : p, q, φ(n)</summary>
+          <label for="kp">p</label><textarea id="kp" rows="3" readonly></textarea>
+          <label for="kq">q</label><textarea id="kq" rows="3" readonly></textarea>
+          <label for="kf">φ(n)</label><textarea id="kf" rows="3" readonly></textarea>
+        </details>
+      </section>
+
+      <!-- Carte 2 : Envoyer un message -->
+      <section class="card b">
+        <h2><span class="n">2</span>Envoyer un message</h2>
+        <p class="f">x ≡ mᵉ (mod n) | clé publique du destinataire (n, e)</p>
+        <label for="to">Destinataire (inscrit ayant généré ses clés)</label>
+        <select id="to"></select>
+        <label for="msg">Message en clair</label>
+        <textarea id="msg" class="msg" rows="4">Bonjour, ceci est un message secret.</textarea>
+        <div class="row">
+          <button id="snd" disabled>Chiffrer et envoyer</button>
+          <span class="st" id="sst"></span>
+        </div>
+        <label for="cip">Dernier message chiffré envoyé (un entier x par bloc)</label>
+        <textarea id="cip" rows="8" readonly></textarea>
+      </section>
+
+      <!-- Carte 3 : Boîte de réception -->
+      <section class="card a">
+        <h2><span class="n">3</span>Boîte de réception</h2>
+        <p class="f">m ≡ xᵈ (mod n) | ma clé privée d</p>
+        <div id="inbox"><span class="st">Aucun message reçu.</span></div>
+      </section>
+
+    </div>
+  </div>
+
+  <footer>Exponentiation rapide et Euclide étendu comme dans le cours. Test de primalité : Miller–Rabin (nécessaire à 500 chiffres). La clé privée reste dans ce navigateur.</footer>
+</main>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Messagerie RSA</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>Messagerie chiffrée RSA</h1>
+    <p class="sub">
+      Bruno envoie un texte à Alice. Seule Alice peut le lire. Basé sur le cours : chapitres 5 et 6.<br>
+      Sur deux PC : Alice (PC 1) génère ses clés et copie la clé publique ; Bruno (PC 2) la colle, chiffre et envoie le message ; Alice le colle et le déchiffre. La clé privée d ne quitte jamais le PC d'Alice.
+    </p>
+
+    <div class="cols">
+
+      <!-- Carte 1 : Alice génère ses clés -->
+      <section class="card a">
+        <h2><span class="n">1</span>PC 1 · Alice : générer ses clés</h2>
+        <p class="f">n = p·q &nbsp;|&nbsp; φ(n) = (p−1)(q−1) &nbsp;|&nbsp; pgcd(e, φ) = 1 &nbsp;|&nbsp; d·e ≡ 1 (mod φ)</p>
+        <label for="dig">Taille des nombres premiers p et q</label>
+        <select id="dig">
+          <option value="500">500 chiffres (exercice)</option>
+          <option value="40">40 chiffres (test rapide)</option>
+        </select>
+        <div class="row">
+          <button id="gen">Générer les clés</button>
+          <button id="cpk" class="s" disabled>Copier la clé publique</button>
+          <span class="st" id="gst"></span>
+        </div>
+        <div class="g">
+          <div>
+            <label for="kn">Clé publique : n <span id="cn"></span></label>
+            <textarea id="kn" rows="3" readonly></textarea>
+            <label for="ke">Clé publique : e</label>
+            <textarea id="ke" rows="1" readonly></textarea>
+          </div>
+          <div>
+            <label for="kd">Clé privée : d <span id="cd"></span></label>
+            <textarea id="kd" rows="3" readonly></textarea>
+          </div>
+        </div>
+        <details>
+          <summary>Valeurs secrètes : p, q, φ(n)</summary>
+          <label for="kp">p</label><textarea id="kp" rows="3" readonly></textarea>
+          <label for="kq">q</label><textarea id="kq" rows="3" readonly></textarea>
+          <label for="kf">φ(n)</label><textarea id="kf" rows="3" readonly></textarea>
+        </details>
+      </section>
+
+      <!-- Carte 2 : Bruno chiffre et envoie -->
+      <section class="card b">
+        <h2><span class="n">2</span>PC 2 · Bruno : chiffrer et envoyer</h2>
+        <p class="f">x ≡ mᵉ (mod n) &nbsp;|&nbsp; clé publique d'Alice (n, e)</p>
+        <label for="pk">Clé publique d'Alice (format n:e, à coller si elle vient de l'autre PC)</label>
+        <textarea id="pk" rows="3" placeholder="Collez ici la clé publique envoyée par Alice"></textarea>
+        <label for="msg">Message en clair</label>
+        <textarea id="msg" class="msg" rows="3">Bonjour Alice, ceci est un message secret.</textarea>
+        <div class="row">
+          <button id="enc">Chiffrer</button>
+          <button id="cpc" class="s" disabled>Copier le message chiffré</button>
+          <button id="snd" class="s" disabled>Envoyer (même PC)</button>
+          <span class="st" id="est"></span>
+        </div>
+        <label for="cip">Message chiffré (un entier x par bloc)</label>
+        <textarea id="cip" rows="4" readonly></textarea>
+      </section>
+
+      <!-- Carte 3 : Alice déchiffre -->
+      <section class="card a">
+        <h2><span class="n">3</span>PC 1 · Alice : déchiffrer</h2>
+        <p class="f">m ≡ xᵈ (mod n) &nbsp;|&nbsp; clé privée d</p>
+        <label for="rec">Message reçu</label>
+        <textarea id="rec" rows="4" placeholder="Collez ici le message chiffré reçu de Bruno"></textarea>
+        <div class="row">
+          <button id="dec">Déchiffrer</button>
+        </div>
+        <label for="out">Message retrouvé</label>
+        <textarea id="out" class="msg" rows="3" readonly></textarea>
+        <div class="ok" id="ok" hidden>✓ Le message déchiffré est identique à celui de Bruno.</div>
+      </section>
+
+    </div>
+
+    <footer>Exponentiation rapide et Euclide étendu comme dans le cours. Test de primalité : Miller–Rabin (nécessaire à 500 chiffres).</footer>
+  </main>
+
+  <script type="module" src="js/rsa-standalone.js"></script>
+</body>
+</html>
